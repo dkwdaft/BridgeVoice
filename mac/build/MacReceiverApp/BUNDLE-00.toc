@@ -1,0 +1,3 @@
+([('MacReceiverApp',
+   '/Users/danny/Projects/BridgeVoice/dist/MacReceiverApp',
+   'EXECUTABLE')],)
