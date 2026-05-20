@@ -24,13 +24,21 @@ class MacAudioReceiver:
         self.stream = None
         self.p = pyaudio.PyAudio()
 
-        # Build GUI
-        self.app = App(title="Wireless Audio Receiver", width=400, height=250)
+        # Build GUI (increased height to 290 to comfortably fit the IP display)
+        self.app = App(title="Wireless Audio Receiver", width=400, height=290)
         self.app.bg = "#f3f4f6"
 
         # Title text
         Text(self.app, text="Mac Audio Receiver", size=18, bold=True, color="#111827")
         Text(self.app, text="Receives audio from Windows Communication Aid", size=10, color="#6b7280")
+
+        # --- NEW: Local Mac IP Display & Copy Section ---
+        self.local_ip = self.get_local_ip()
+        ip_display_box = Box(self.app, width=350, height=40)
+        Text(ip_display_box, text=f"Mac IP Address: {self.local_ip}", size=11, align="left", bold=True, color="#374151")
+        copy_btn = PushButton(ip_display_box, command=self.copy_ip_to_clipboard, text="Copy IP", align="right", width=8)
+        copy_btn.bg = "#e5e7eb"
+        copy_btn.text_size = 9
 
         # Status box
         self.status_box = Box(self.app, width=350, height=60, layout="grid")
@@ -48,6 +56,41 @@ class MacAudioReceiver:
 
         self.app.when_closed = self.on_close
         self.app.display()
+
+    # --- NEW METHOD: Finds the Mac's primary local network IP ---
+    def get_local_ip(self):
+        try:
+            # Opens a temporary socket to public DNS to force the OS to pick 
+            # the active network interface (Wi-Fi or Ethernet) instead of localhost.
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
+
+    # --- NEW METHOD: Copies IP to clipboard using built-in Tkinter hooks ---
+    def copy_ip_to_clipboard(self):
+        # Because guizero wraps Tkinter natively, we can use it to touch the macOS clipboard dependency-free
+        self.app.tk.clipboard_clear()
+        self.app.tk.clipboard_append(self.local_ip)
+        
+        # Give the user visual feedback in the status bar
+        old_status = self.status_label.value
+        old_color = self.status_label.text_color
+        
+        self.status_label.value = "IP Copied to Clipboard!"
+        self.status_label.text_color = "#2563eb"
+        
+        # Revert status back to what it was after 1.5 seconds
+        self.app.after(1500, lambda: self.reset_status(old_status, old_color))
+
+    def reset_status(self, text, color):
+        # Only revert if a fresh network event didn't rewrite the status panel in the meantime
+        if "Copied" in self.status_label.value:
+            self.status_label.value = text
+            self.status_label.text_color = color
 
     def get_virtual_device_index(self):
         for i in range(self.p.get_device_count()):
@@ -106,22 +149,26 @@ class MacAudioReceiver:
         self.running = False
         self.btn.text = "Start Listening"
         self.btn.bg = "#3b82f6"
-        if self.status_label.value != "Status: Connected to Aid":
+        if "Connected" not in self.status_label.value and "Copied" not in self.status_label.value:
             self.status_label.value = "Status: Stopped"
             self.status_label.text_color = "#dc2626"
 
         if self.server_socket:
             self.server_socket.close()
+            self.server_socket = None
         if self.stream:
-            self.stream.stop_stream()
-            self.stream.close()
+            try:
+                self.stream.stop_stream()
+                self.stream.close()
+            except Exception:
+                pass
             self.stream = None
 
     def on_close(self):
-        self.stop_receiver()
+        self.stop_sender() if hasattr(self, 'stop_sender') else self.stop_receiver()
         self.p.terminate()
         self.app.destroy()
 
 
 if __name__ == "__main__":
-    MacAudioReceiver() 
+    MacAudioReceiver()
