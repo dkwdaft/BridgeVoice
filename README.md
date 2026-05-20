@@ -23,9 +23,9 @@ Open your respective command line tools on both machines and install the followi
   ```
  * **On the Windows Communication Aid (Command Prompt):**
 
+  ```bash
+  pip install pyaudiowpatch guizero
   ```
-pip install pyaudiowpatch guizero
-```
 *(Note: `pyaudiowpatch` is specifically required on Windows to safely copy and loop back the system's output volume layer).*
 
 ---
